@@ -9,7 +9,8 @@ pagination, multipart and direct uploads, API versioning, retries, middleware,
 cancellation — without asking the backend to change.
 
 **No server-side package is required.** Point the SDK at an existing API and it
-works.
+works — whether it authenticates with tokens (Sanctum, Passport, or your own
+controller) or with the cookie session Laravel's API starter kit generates.
 
 ```swift
 let client = LaravelClient(baseURL: URL(string: "https://api.example.com")!)

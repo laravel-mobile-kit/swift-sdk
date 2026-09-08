@@ -39,8 +39,8 @@ them as unverified rather than guaranteed.
 | Presigned direct uploads (Vapor-style and hand-written) | Supported |
 | Sanctum personal access tokens | Supported |
 | Official starter kit (`breeze:install api`) | Verified end to end against unmodified Breeze scaffolding |
-| Sanctum SPA cookie sessions | Supported: `URLSession` owns the cookie jar, and the CSRF header is one middleware — see [Authentication](AUTHENTICATION.md#cookie-sessions-sanctum-spa-breeze-api) |
-| Bearer-token session storage (`AuthManager`, `AuthSession`) | Token APIs only; a cookie SPA uses the Core client directly |
+| Sanctum SPA cookie sessions | Supported by `LaravelClient.sanctumSPA`, `SanctumSPAAuth`, and `SanctumSPASession` |
+| Bearer-token sessions (`AuthManager`, `AuthSession`) | Token APIs; a cookie API uses the Sanctum SPA types instead |
 | Passport / OAuth payloads | Supported through `AuthResponseMapper` |
 | Non-standard JSON | Supported through the generic Core client |
 | Generated models | Never required |

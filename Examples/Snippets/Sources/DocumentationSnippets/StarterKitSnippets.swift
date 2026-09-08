@@ -2,57 +2,63 @@ import Foundation
 
 import LaravelMobileKit
 
-/// The cookie-session middleware printed in `Documentation/AUTHENTICATION.md`.
-struct SanctumCSRFMiddleware: Middleware {
-    let cookieStorage: HTTPCookieStorage
-    let baseURL: URL
-
-    func process(_ request: URLRequest) async throws -> URLRequest {
-        guard request.httpMethod != "GET", request.httpMethod != "HEAD" else { return request }
-
-        guard let cookies = cookieStorage.cookies(for: baseURL),
-              let token = cookies.first(where: { $0.name == "XSRF-TOKEN" })?.value
-        else {
-            return request
-        }
-
-        var request = request
-        request.setValue(token.removingPercentEncoding ?? token, forHTTPHeaderField: "X-XSRF-TOKEN")
-        return request
-    }
-}
-
 /// Examples from the "Cookie sessions" section of `AUTHENTICATION.md`.
 enum StarterKitSnippets {
-    static func makeCookieClient() -> (LaravelClient, HTTPCookieStorage) {
-        let sessionConfiguration = URLSessionConfiguration.ephemeral
-        sessionConfiguration.httpShouldSetCookies = true
-        let cookies = sessionConfiguration.httpCookieStorage ?? .shared
+    @MainActor
+    static func wireUp() async -> (LaravelClient, SanctumSPAAuth<AppUser>, SanctumSPASession<AppUser>) {
+        let client = await LaravelClient.sanctumSPA(baseURL: baseURL)
+        await client.use(.validationErrors)
 
-        let client = LaravelClient(
-            configuration: LaravelClientConfiguration(
-                baseURL: baseURL,
-                defaultHeaders: LaravelClientConfiguration.defaultJSONHeaders
-                    .merging(["Referer": baseURL.absoluteString]) { _, new in new }
-            ),
-            transport: URLSessionTransport(configuration: sessionConfiguration)
-        )
+        let session = SanctumSPASession<AppUser>(client: client)
+        let auth = SanctumSPAAuth<AppUser>(client: client, session: session)
 
-        return (client, cookies)
+        return (client, auth, session)
     }
 
-    static func signIn(email: String, password: String) async throws -> AppUser {
-        let (client, cookies) = makeCookieClient()
-        await client.use(SanctumCSRFMiddleware(cookieStorage: cookies, baseURL: baseURL))
+    @MainActor
+    static func flows(email: String, password: String, name: String) async throws {
+        let (_, auth, session) = await wireUp()
 
-        _ = try await client.raw(.get, "/sanctum/csrf-cookie")
-        let _: EmptyResponse = try await client.post(
-            "/login",
-            body: ["email": email, "password": password]
+        try await auth.login(email: email, password: password)
+        _ = try await auth.register(fields: [
+            "name": name,
+            "email": email,
+            "password": password,
+            "password_confirmation": password,
+        ])
+        _ = try await auth.currentUser()
+        try await auth.requestPasswordReset(email: email)
+        await auth.logout()
+
+        await session.restore()
+        _ = session.user
+    }
+
+    static func cookieJars() async -> (LaravelClient, LaravelClient) {
+        // Persistent — a returning user is still signed in.
+        let client = await LaravelClient.sanctumSPA(baseURL: baseURL)
+
+        // Private and in-memory — what tests and previews want.
+        let jar = URLSessionConfiguration.ephemeral.httpCookieStorage!
+        let isolated = await LaravelClient.sanctumSPA(baseURL: baseURL, cookieStorage: jar)
+
+        return (client, isolated)
+    }
+
+    static func customRoutes(client: LaravelClient) -> SanctumSPAAuth<AppUser> {
+        SanctumSPAAuth<AppUser>(
+            client: client,
+            configuration: SanctumSPAConfiguration(
+                csrfCookieEndpoint: "/sanctum/csrf-cookie",
+                loginEndpoint: "/api/session",
+                registerEndpoint: "/api/accounts",
+                logoutEndpoint: "/api/session/end",
+                userEndpoint: "/api/me"
+            )
         )
-        let user: AppUser = try await client.get("/api/user")
-        let _: EmptyResponse = try await client.post("/logout", body: Optional<String>.none)
+    }
 
-        return user
+    static func middlewareOnItsOwn(client: LaravelClient) async {
+        await client.use(.sanctumCSRF(baseURL: baseURL, cookieStorage: .shared))
     }
 }

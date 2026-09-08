@@ -118,6 +118,11 @@ extension LaravelError {
 | `enum AuthTransport` | `.bearer`, `.scheme(String)`, `.cookie`, `.custom(_)` |
 | `actor TokenRefreshCoordinator` | `refreshIfNeeded()`, `invalidate()`, `isRefreshing` — single-flight refresh |
 | `struct AuthRefreshRetryDecider` | `init(coordinator:maxAttempts:onAuthFailure:)` |
+| `actor SanctumSPAAuth<User>` | Cookie-session flows: `startSession()`, `login(email:password:extraFields:)`, `login(fields:)`, `register(fields:)`, `currentUser()`, `logout()`, `requestPasswordReset(email:)`, `resendEmailVerification()` |
+| `struct SanctumSPAConfiguration` | Endpoints for a cookie session. `.breeze` matches Laravel's API starter kit |
+| `@MainActor final class SanctumSPASession<User>` | `state`, `user`, `lastError`, `restore()`, `adopt(user:)`, `reloadUser()`, `signedOut()`, `endSession(reason:)` |
+| `struct SanctumCSRFMiddleware` | `.sanctumCSRF(baseURL:cookieStorage:)`, with configurable cookie and header names |
+| `LaravelClient.sanctumSPA(baseURL:…)` | A client wired for a cookie session: jar, `Referer`, CSRF middleware |
 | `enum AuthError` | `.notAuthenticated`, `.refreshNotSupported`, `.noRefreshToken`, `.sessionExpired`, `.endpointNotConfigured(String)`, `.invalidAuthResponse` |
 | `enum KeychainError` | `.unableToStore(OSStatus)`, `.unableToRetrieve(OSStatus)`, `.unableToDelete(OSStatus)`, `.corruptedCredential`, plus `status` and `isKeychainUnavailable` |
 
