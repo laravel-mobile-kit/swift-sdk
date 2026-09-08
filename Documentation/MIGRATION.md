@@ -66,6 +66,24 @@ several refreshes, and a failed refresh leaves the app in an ambiguous state.
 `TokenRefreshCoordinator` plus `AuthRefreshRetryDecider` fixes both — see
 [Authentication](AUTHENTICATION.md).
 
+## 4b. Coming from a cookie-based client instead
+
+If your app talks to a Sanctum SPA — the contract Laravel's API starter kit
+generates — there is no token to move and no 401 handler to replace. What you
+delete is the CSRF plumbing:
+
+```swift
+// Before: fetch /sanctum/csrf-cookie, dig the XSRF-TOKEN cookie out of
+// HTTPCookieStorage, re-read it after every sign-in, remember the Referer.
+// After:
+let client = await LaravelClient.sanctumSPA(baseURL: baseURL)
+let auth = SanctumSPAAuth<AppUser>(client: client, session: session)
+try await auth.login(email: email, password: password)
+```
+
+Keep using the shared cookie jar and your session survives a relaunch exactly as
+it did before. See [Authentication](AUTHENTICATION.md#cookie-sessions-sanctum-spa-breeze-api).
+
 ## 5. Delete the pagination bookkeeping
 
 ```swift

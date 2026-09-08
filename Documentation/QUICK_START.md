@@ -72,6 +72,13 @@ let result = try await auth.login(
 The issued credential is stored in the Keychain, and every later request carries
 it.
 
+> **Does your API issue no token?** Laravel's own API starter kit
+> (`breeze:install api`) authenticates with a session cookie instead. Steps 4
+> to 6 then look different — `LaravelClient.sanctumSPA`, `SanctumSPAAuth`, and
+> `SanctumSPASession` replace the Keychain, `AuthManager`, and the refresh
+> coordinator. Everything else on this page is unchanged. See
+> [Authentication](AUTHENTICATION.md#cookie-sessions-sanctum-spa-breeze-api).
+
 ## 5. Restore the session at launch
 
 ```swift
@@ -183,7 +190,7 @@ and honoured by the transport, so a cancelled screen stops costing bandwidth.
 
 ## Where to go next
 
-- [Authentication](AUTHENTICATION.md) for endpoints that differ from Laravel's defaults
+- [Authentication](AUTHENTICATION.md) for endpoints that differ from Laravel's defaults, and for cookie sessions
 - [Pagination](PAGINATION.md) for cursor and simple paginators
 - [Error handling](ERROR_HANDLING.md) for the full error taxonomy
 - [Middleware](MIDDLEWARE.md) to add logging, tracing, or your own headers

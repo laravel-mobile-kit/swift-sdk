@@ -40,7 +40,7 @@ See [Installation](Documentation/INSTALLATION.md) for the module map.
 | --- | --- |
 | `LaravelMobileKitCore` | `LaravelClient`, transport, Codable, errors, retries, middleware, headers |
 | `LaravelMobileKitLaravel` | Validation errors, pagination, API versioning |
-| `LaravelMobileKitAuth` | Credential storage, token providers, sessions, refresh coordination |
+| `LaravelMobileKitAuth` | Credential storage, token providers, sessions, refresh coordination, Sanctum SPA cookie sessions |
 | `LaravelMobileKitUploads` | Multipart and presigned direct uploads |
 | `LaravelMobileKit` | Umbrella re-exporting all four |
 
@@ -98,12 +98,16 @@ run against Laravel 12 and 13 — see
 ## Tests
 
 ```sh
-swift test                                   # unit suite
+swift test                                            # unit suite
 
-TestApp/scripts/serve.sh                     # a real Laravel app
-LARAVEL_TEST_URL=http://127.0.0.1:8000 swift test   # + integration suite
+TestApp/scripts/serve.sh                              # a real Laravel app
+LARAVEL_TEST_URL=http://127.0.0.1:8000 swift test     # + integration suite
+
+TestApp/scripts/serve-breeze.sh                       # Laravel's API starter kit
+LARAVEL_BREEZE_URL=http://127.0.0.1:8200 swift test   # + starter-kit suite
 ```
 
-The integration suite runs against the Laravel application in
-[`TestApp/`](TestApp), which is generated from the official skeleton — the kit is
-verified against Laravel's actual responses, not against mocks of them.
+Both fixtures in [`TestApp/`](TestApp) are generated from the official skeleton,
+so the kit is verified against Laravel's actual responses rather than mocks of
+them. The second one is `php artisan breeze:install api` with nothing of ours
+added, which is how starter-kit compatibility is kept honest.

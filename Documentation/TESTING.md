@@ -71,4 +71,13 @@ Two details make these tests predictable:
   binary cannot always reach.
 
 For view models built on `AuthSession`, drive the state through the session
-rather than the network: `signIn(with:)` takes a credential you construct.
+rather than the network: `signIn(with:)` takes a credential you construct. The
+cookie-session equivalent is `SanctumSPASession.adopt(user:)`.
+
+A cookie-session client needs a jar of its own per test, or one test signs
+another one in:
+
+```swift
+let jar = URLSessionConfiguration.ephemeral.httpCookieStorage!
+let client = await LaravelClient.sanctumSPA(baseURL: baseURL, cookieStorage: jar)
+```

@@ -30,7 +30,7 @@ surface depends on the capabilities it actually uses:
 | --- | --- | --- |
 | `LaravelMobileKitCore` | — | HTTP, Codable, errors, retries, middleware |
 | `LaravelMobileKitLaravel` | Core | Validation errors, pagination, versioning |
-| `LaravelMobileKitAuth` | Core | Keychain storage, tokens, sessions, refresh |
+| `LaravelMobileKitAuth` | Core | Keychain storage, tokens, sessions, refresh, Sanctum SPA cookie sessions |
 | `LaravelMobileKitUploads` | Core | Multipart and direct uploads |
 | `LaravelMobileKit` | all of the above | Everything, one import |
 

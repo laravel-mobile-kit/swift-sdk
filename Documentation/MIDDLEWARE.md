@@ -14,6 +14,16 @@ public protocol Middleware: Sendable {
 `didReceive` has a default empty implementation, so a middleware that only
 rewrites requests implements one method.
 
+## What ships with the kit
+
+| Middleware | Module | What it does |
+| --- | --- | --- |
+| `.auth(provider)` | Auth | Attaches the current token |
+| `.sanctumCSRF(baseURL:)` | Auth | Sends Sanctum's CSRF token on unsafe requests |
+| `.validationErrors` | Laravel | Turns a 422 into a `LaravelValidationError` |
+| `.apiVersion(.v1)` | Laravel | Prefixes paths with an API version |
+| `LoggingMiddleware(level:)` | Core | Logs requests and responses |
+
 ## Registering
 
 ```swift
