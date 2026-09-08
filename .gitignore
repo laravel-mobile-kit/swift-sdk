@@ -1,0 +1,28 @@
+# macOS
+.DS_Store
+
+# Swift Package Manager
+.build/
+.swiftpm/
+Packages/
+*.xcodeproj
+*.xcworkspace
+!*.xcodeproj/project.pbxproj
+
+# Xcode
+xcuserdata/
+DerivedData/
+*.xcuserstate
+
+# Secrets
+.env
+.env.local
+
+# Editorial backups
+*.bak
+
+# Task Master (local planning state)
+.taskmaster/
+
+# Generated Laravel fixture (see TestApp/README.md)
+TestApp/.laravel/

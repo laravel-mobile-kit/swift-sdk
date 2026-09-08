@@ -1,0 +1,11 @@
+services:
+  laravel:
+    build: .
+    ports:
+      - "${LARAVEL_TEST_PORT:-8000}:8000"
+    healthcheck:
+      test: ["CMD", "php", "-r", "exit(@file_get_contents('http://127.0.0.1:8000/api/version') ? 0 : 1);"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s

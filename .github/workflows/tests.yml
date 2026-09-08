@@ -1,0 +1,66 @@
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit:
+    name: Unit tests
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run the unit suite
+        # Without LARAVEL_TEST_URL the integration suites skip themselves.
+        run: swift test
+
+  integration:
+    name: Integration tests against Laravel
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      # The kit builds against Apple's Security framework, so the suite has to
+      # run on macOS; the fixture therefore runs directly on the runner rather
+      # than through the Docker Compose file used locally.
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: sqlite3, pdo_sqlite, zip
+          tools: composer
+
+      - name: Build the Laravel fixture
+        run: TestApp/scripts/build-app.sh
+
+      - name: Serve the fixture
+        run: |
+          nohup php TestApp/.laravel/artisan serve --host 127.0.0.1 --port 8000 &
+          for _ in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8000/api/version >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "The fixture never became reachable" >&2
+          exit 1
+
+      - name: Run the integration suite
+        env:
+          LARAVEL_TEST_URL: http://127.0.0.1:8000
+        run: swift test
+
+  sample:
+    name: Quick-start sample builds
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the sample application
+        run: swift build --package-path Examples/QuickStart
+
+      - name: Build the documentation snippets
+        run: swift build --package-path Examples/Snippets
