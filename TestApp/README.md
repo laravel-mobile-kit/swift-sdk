@@ -40,6 +40,25 @@ LARAVEL_VERSION='^13.0' TestApp/scripts/serve.sh
 Delete `TestApp/.laravel` to rebuild from scratch. Each start re-applies the
 overlay and re-runs `migrate:fresh --seed`, so the data is identical every time.
 
+## The starter-kit fixture
+
+`TestApp/.breeze` is a second, separate application: `laravel/laravel` plus
+`php artisan breeze:install api`, with no overlay of ours applied. Its routes,
+controllers, and form requests are the ones Laravel generates, and its
+authentication contract is Sanctum's cookie-based SPA session rather than bearer
+tokens — which is what `StarterKitIntegrationTests` is there to prove the kit
+works against.
+
+```sh
+TestApp/scripts/serve-breeze.sh                        # builds and serves on :8200
+LARAVEL_BREEZE_URL=http://127.0.0.1:8200 swift test    # runs the starter-kit suite
+```
+
+Its seed data is the stock skeleton's: one user, `test@example.com` /
+`password`. Endpoints are whatever Breeze publishes — `/register`, `/login`,
+`/logout`, `/forgot-password`, `/reset-password`, `/api/user`, and
+`/sanctum/csrf-cookie`.
+
 ## Seed data
 
 - User `test@example.com` / `password`.

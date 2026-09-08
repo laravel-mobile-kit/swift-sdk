@@ -193,6 +193,79 @@ APIs without refresh tokens skip the coordinator: a 401 then means the session
 is over, which is exactly what `AuthSession` reports when there is nothing to
 refresh with.
 
+## Cookie sessions (Sanctum SPA, Breeze API)
+
+Laravel's API starter kit does not issue tokens at all. `breeze:install api`
+generates a session-cookie contract: the client fetches a CSRF cookie, posts
+credentials to `/login`, and is authenticated by the session cookie from then
+on. `AuthManager` and `AuthCredential` are token-shaped and do not apply here —
+what you need instead is the CSRF header and a cookie jar, both of which
+`URLSession` and one middleware cover:
+
+```swift
+struct SanctumCSRFMiddleware: Middleware {
+    let cookieStorage: HTTPCookieStorage
+    let baseURL: URL
+
+    func process(_ request: URLRequest) async throws -> URLRequest {
+        guard request.httpMethod != "GET", request.httpMethod != "HEAD" else { return request }
+
+        guard let cookies = cookieStorage.cookies(for: baseURL),
+              let token = cookies.first(where: { $0.name == "XSRF-TOKEN" })?.value
+        else {
+            return request
+        }
+
+        var request = request
+        request.setValue(token.removingPercentEncoding ?? token, forHTTPHeaderField: "X-XSRF-TOKEN")
+        return request
+    }
+}
+```
+
+The token is re-read from the jar on every request because Laravel regenerates
+the session — and the token with it — on sign-in and sign-out.
+
+Two details make Sanctum treat the request as stateful:
+
+```swift
+let sessionConfiguration = URLSessionConfiguration.ephemeral   // its own cookie jar
+sessionConfiguration.httpShouldSetCookies = true
+
+let client = LaravelClient(
+    configuration: LaravelClientConfiguration(
+        baseURL: baseURL,
+        defaultHeaders: LaravelClientConfiguration.defaultJSONHeaders
+            // Sanctum only accepts a session from a domain it was told about.
+            .merging(["Referer": baseURL.absoluteString]) { _, new in new }
+    ),
+    transport: URLSessionTransport(configuration: sessionConfiguration)
+)
+await client.use(SanctumCSRFMiddleware(cookieStorage: cookies, baseURL: baseURL))
+```
+
+Then the flow is ordinary requests:
+
+```swift
+_ = try await client.raw(.get, "/sanctum/csrf-cookie")            // the handshake
+let _: EmptyResponse = try await client.post("/login", body: ["email": email, "password": password])
+let user: User = try await client.get("/api/user")
+let _: EmptyResponse = try await client.post("/logout", body: Optional<String>.none)
+```
+
+The server must list the app's origin in `SANCTUM_STATEFUL_DOMAINS`. Validation
+failures still arrive as `LaravelValidationError`, so a sign-in form behaves the
+same as it does against a token API.
+
+This flow is covered by the starter-kit suite in
+`Tests/LaravelMobileKitIntegrationTests/StarterKitIntegrationTests.swift`, which
+runs against an unmodified `breeze:install api` application — see
+[Testing](TESTING.md).
+
+`AuthTransport.cookie` is a different thing: it writes a `Cookie` header from a
+token you hold yourself, for APIs that authenticate that way. A Sanctum SPA does
+not need it — `URLSession` owns the cookie jar.
+
 ## Errors
 
 | `AuthError` | When |

@@ -5,10 +5,10 @@
  * everything the Laravel skeleton wrote alone.
  */
 
-[$script, $path] = $argv + [null, null];
+$path = $argv[1] ?? null;
 
 if ($path === null) {
-    fwrite(STDERR, "usage: configure-env.php <path-to-.env>\n");
+    fwrite(STDERR, "usage: configure-env.php <path-to-.env> [KEY=VALUE …]\n");
     exit(1);
 }
 
@@ -20,6 +20,12 @@ $settings = [
     'MAIL_MAILER' => 'log',
     'APP_DEBUG' => 'true',
 ];
+
+// Anything passed on the command line is applied on top.
+foreach (array_slice($argv, 2) as $pair) {
+    [$key, $value] = array_pad(explode('=', $pair, 2), 2, '');
+    $settings[$key] = $value;
+}
 
 $lines = file_exists($path) ? file($path, FILE_IGNORE_NEW_LINES) : [];
 

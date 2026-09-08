@@ -26,3 +26,4 @@ DerivedData/
 
 # Generated Laravel fixture (see TestApp/README.md)
 TestApp/.laravel/
+TestApp/.breeze/

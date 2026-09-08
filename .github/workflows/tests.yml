@@ -49,9 +49,23 @@ jobs:
           echo "The fixture never became reachable" >&2
           exit 1
 
-      - name: Run the integration suite
+      - name: Build and serve the starter-kit fixture
+        run: |
+          TestApp/scripts/build-breeze-app.sh
+          nohup php TestApp/.breeze/artisan serve --host 127.0.0.1 --port 8200 &
+          for _ in $(seq 1 30); do
+            if curl -fsS -o /dev/null http://127.0.0.1:8200/up; then
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "The starter-kit fixture never became reachable" >&2
+          exit 1
+
+      - name: Run the integration and starter-kit suites
         env:
           LARAVEL_TEST_URL: http://127.0.0.1:8000
+          LARAVEL_BREEZE_URL: http://127.0.0.1:8200
         run: swift test
 
   sample:

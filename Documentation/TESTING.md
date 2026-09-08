@@ -5,18 +5,22 @@
 | Suite | What it proves | Needs |
 | --- | --- | --- |
 | `LaravelMobileKitTests` | Request construction, serialization, error mapping, retries, cancellation, auth state, refresh coordination, middleware — against a mocked transport | Nothing |
-| `LaravelMobileKitIntegrationTests` | The same contracts against a real Laravel application | A running fixture |
+| `LaravelMobileKitIntegrationTests` | The same contracts against a real Laravel application | `LARAVEL_TEST_URL` |
+| `Laravel starter kit (Breeze API)` | The kit against scaffolding Laravel generated, not ours | `LARAVEL_BREEZE_URL` |
 
 ```sh
 swift test                                            # unit suite only
 TestApp/scripts/serve.sh                              # in another terminal
-LARAVEL_TEST_URL=http://127.0.0.1:8000 swift test     # both suites
+LARAVEL_TEST_URL=http://127.0.0.1:8000 swift test     # + the integration suite
+
+TestApp/scripts/serve-breeze.sh                       # the starter-kit fixture
+LARAVEL_BREEZE_URL=http://127.0.0.1:8200 swift test   # + the starter-kit suite
 ```
 
-Without `LARAVEL_TEST_URL` every integration suite skips itself, so `swift test`
-stays useful on a machine with no fixture.
+Each suite skips itself when its variable is unset, so `swift test` stays useful
+on a machine with no fixture running.
 
-## The fixture
+## The fixtures
 
 [`TestApp/`](../TestApp) holds a Laravel application generated from the official
 skeleton with this repository's routes, controllers, models, and seed data
@@ -30,6 +34,15 @@ TestApp/scripts/serve.sh                                   # PHP 8.2+ and Compos
 
 Seed data: `test@example.com` / `password`, and 45 events titled `Event 01`…
 `Event 45`. The endpoint list is in [`TestApp/README.md`](../TestApp/README.md).
+
+The second fixture, `TestApp/.breeze`, is `laravel/laravel` plus
+`php artisan breeze:install api` and nothing else — no overlay, no routes of
+ours. It proves the kit against the contract Laravel's own starter kit
+generates, which is a cookie session rather than a bearer token:
+
+```sh
+TestApp/scripts/serve-breeze.sh    # builds and serves on :8200
+```
 
 ## Testing your own app against the kit
 

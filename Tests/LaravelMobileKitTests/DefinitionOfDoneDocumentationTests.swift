@@ -57,6 +57,7 @@ struct DefinitionOfDoneDocumentationTests {
             "UploadIntegrationTests",
             "VersioningIntegrationTests",
             "RequestBehaviorIntegrationTests",
+            "StarterKitIntegrationTests",
             "DefinitionOfDoneTests",
         ] {
             #expect(
@@ -76,6 +77,11 @@ struct DefinitionOfDoneDocumentationTests {
         // The fixture is generated from the official skeleton, not hand-written.
         #expect(script.contains("composer create-project"))
         #expect(script.contains("laravel/laravel"))
+
+        // And the second fixture is Laravel's own starter kit, untouched.
+        let starterKit = try read("TestApp/scripts/build-breeze-app.sh")
+        #expect(starterKit.contains("laravel/breeze"))
+        #expect(starterKit.contains("breeze:install api"))
     }
 
     // MARK: 20. The compatibility matrix is documented
@@ -126,6 +132,7 @@ struct DefinitionOfDoneDocumentationTests {
         for guide in [
             "QuickStart", "Authentication", "Pagination", "Upload",
             "ErrorHandling", "Versioning", "Middleware", "Migration",
+            "StarterKit",
         ] {
             #expect(
                 exists("Examples/Snippets/Sources/DocumentationSnippets/\(guide)Snippets.swift"),
