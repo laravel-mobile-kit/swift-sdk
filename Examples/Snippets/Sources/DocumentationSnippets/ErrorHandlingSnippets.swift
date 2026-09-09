@@ -62,7 +62,9 @@ enum ErrorHandlingSnippets {
                 retryableStatusCodes: [408, 429, 500, 502, 503, 504],
                 retryableMethods: RetryPolicy.idempotentMethods,
                 backoffStrategy: .exponential(base: 0.5, maxDelay: 30),
-                retriesNetworkFailures: true
+                retriesNetworkFailures: true,
+                jitter: .full,
+                maximumRetryAfter: 60
             )
         )
     }

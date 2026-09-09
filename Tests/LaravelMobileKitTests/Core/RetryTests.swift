@@ -52,6 +52,123 @@ struct RetryTests {
         #expect(BackoffStrategy.none.delay(for: 9) == 0)
     }
 
+    // MARK: - Retry-After and jitter
+
+    /// A failure carrying the response headers a server would have sent.
+    private func failure(status: Int, headers: [String: String] = [:]) -> LaravelError {
+        let response = HTTPURLResponse(
+            url: baseURL,
+            statusCode: status,
+            httpVersion: "HTTP/1.1",
+            headerFields: headers
+        )!
+        return .httpError(HTTPError(statusCode: status, data: nil, response: response))
+    }
+
+    private var unjittered: RetryPolicy {
+        RetryPolicy(maxRetries: 3, backoffStrategy: .exponential(base: 0.5, maxDelay: 30), jitter: .none)
+    }
+
+    @Test("Retry-After in seconds wins over the backoff schedule")
+    func retryAfterSeconds() {
+        let wait = unjittered.wait(
+            forAttempt: 0,
+            after: failure(status: 429, headers: ["Retry-After": "7"])
+        )
+
+        // The schedule would have said 0.5s; the server said 7.
+        #expect(wait == 7)
+    }
+
+    @Test("Retry-After as an HTTP date is honoured")
+    func retryAfterHTTPDate() {
+        let now = Date(timeIntervalSince1970: 1_445_412_480)  // 21 Oct 2015 07:28:00 GMT
+        let wait = unjittered.wait(
+            forAttempt: 0,
+            after: failure(status: 503, headers: ["Retry-After": "Wed, 21 Oct 2015 07:28:30 GMT"]),
+            now: now
+        )
+
+        #expect(wait == 30)
+    }
+
+    @Test("A Retry-After date already in the past means no wait, not a negative one")
+    func retryAfterInThePast() {
+        let now = Date(timeIntervalSince1970: 1_445_412_480)
+        let wait = unjittered.wait(
+            forAttempt: 0,
+            after: failure(status: 503, headers: ["Retry-After": "Wed, 21 Oct 2015 07:27:00 GMT"]),
+            now: now
+        )
+
+        #expect(wait == 0)
+    }
+
+    @Test("An unparseable Retry-After falls back to the backoff schedule")
+    func retryAfterGarbage() {
+        let wait = unjittered.wait(
+            forAttempt: 1,
+            after: failure(status: 503, headers: ["Retry-After": "soon-ish"])
+        )
+
+        #expect(wait == 1)  // exponential: 0.5 * 2^1
+    }
+
+    @Test("A Retry-After longer than the client will wait ends the retries")
+    func retryAfterBeyondTheCap() {
+        var policy = unjittered
+        policy.maximumRetryAfter = 60
+
+        #expect(policy.wait(forAttempt: 0, after: failure(status: 429, headers: ["Retry-After": "60"])) == 60)
+        #expect(policy.wait(forAttempt: 0, after: failure(status: 429, headers: ["Retry-After": "61"])) == nil)
+    }
+
+    @Test("A server asking for an unreasonable wait is not retried at all")
+    func hugeRetryAfterStopsTheRequest() async throws {
+        let transport = MockTransport(statusCode: 429, headers: ["Retry-After": "3600"])
+        let client = makeClient(transport: transport, policy: RetryPolicy(maxRetries: 3))
+
+        await #expect(throws: LaravelError.self) {
+            let _: Event = try await client.get("/api/events/1")
+        }
+        // Without the cap this would have been four attempts an hour apart.
+        #expect(await transport.attemptCount == 1)
+    }
+
+    @Test("Full jitter keeps every wait inside the computed ceiling")
+    func fullJitterStaysWithinTheCeiling() {
+        let policy = RetryPolicy(
+            maxRetries: 3,
+            backoffStrategy: .exponential(base: 0.5, maxDelay: 30),
+            jitter: .full
+        )
+        let ceiling = BackoffStrategy.exponential(base: 0.5, maxDelay: 30).delay(for: 3)
+
+        let draws = (0 ..< 200).map { _ in
+            policy.wait(forAttempt: 3, after: failure(status: 503)) ?? -1
+        }
+
+        #expect(draws.allSatisfy { $0 >= 0 && $0 <= ceiling })
+        // Spreading is the whole point, so the draws must not all be identical.
+        #expect(Set(draws).count > 1)
+    }
+
+    @Test("Jitter never shortens a wait the server asked for")
+    func jitterDoesNotUndercutRetryAfter() {
+        let policy = RetryPolicy(maxRetries: 3, jitter: .full)
+
+        let draws = (0 ..< 50).map { _ in
+            policy.wait(forAttempt: 0, after: failure(status: 429, headers: ["Retry-After": "5"]))
+        }
+
+        #expect(draws.allSatisfy { $0 == 5 })
+    }
+
+    @Test("Without jitter the wait is exactly what the schedule computed")
+    func noJitterIsExact() {
+        #expect(unjittered.wait(forAttempt: 2, after: failure(status: 503)) == 2)
+    }
+
     // MARK: - Retry decisions
 
     @Test("A transient status is retried until the server answers")

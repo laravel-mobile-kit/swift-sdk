@@ -36,9 +36,13 @@ extension LaravelClient {
                 try validateHTTPStatus(response, data: data)
                 return (data, response)
             } catch let error as LaravelError {
+                // A nil wait is the policy declining the retry outright — the
+                // server asked to be left alone for longer than this client
+                // will wait, and shortening that is not ours to decide.
                 if policyAttempt < policy.maxRetries,
-                   policy.shouldRetry(error, method: request.method) {
-                    try await backOff(policy.backoffStrategy.delay(for: policyAttempt))
+                   policy.shouldRetry(error, method: request.method),
+                   let wait = policy.wait(forAttempt: policyAttempt, after: error) {
+                    try await backOff(wait)
                     policyAttempt += 1
                     continue
                 }

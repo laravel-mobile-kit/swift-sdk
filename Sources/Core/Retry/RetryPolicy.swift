@@ -7,6 +7,20 @@ import Foundation
 /// retried create can produce a duplicate record. Add it explicitly only for
 /// endpoints that are safe to repeat.
 public struct RetryPolicy: Sendable, Hashable {
+    /// How a computed wait is randomised.
+    public enum Jitter: Sendable, Hashable {
+        /// Wait exactly what the backoff strategy computed.
+        case none
+        /// Wait a random duration in `0 ... delay`.
+        ///
+        /// Clients that fail together retry together: a server that drops
+        /// requests for a second gets every one of them back at the same
+        /// instant, having done nothing to reduce the load that caused it.
+        /// Spreading the waits is what stops a recovery from re-creating the
+        /// outage.
+        case full
+    }
+
     /// Number of additional attempts after the initial one. `0` disables retries.
     public var maxRetries: Int
     /// HTTP status codes that are considered transient.
@@ -17,19 +31,32 @@ public struct RetryPolicy: Sendable, Hashable {
     public var backoffStrategy: BackoffStrategy
     /// Whether timeouts and connection failures are retried as well.
     public var retriesNetworkFailures: Bool
+    /// How the computed delay is randomised.
+    public var jitter: Jitter
+    /// The longest `Retry-After` this client is willing to honour.
+    ///
+    /// A server asking for longer than this ends the retries rather than being
+    /// quietly ignored: waiting less than asked is what the header exists to
+    /// prevent, and sleeping for an unbounded interval hands a broken or
+    /// hostile server control of the client.
+    public var maximumRetryAfter: TimeInterval
 
     public init(
         maxRetries: Int,
         retryableStatusCodes: Set<Int> = RetryPolicy.defaultRetryableStatusCodes,
         retryableMethods: Set<HTTPMethod> = RetryPolicy.idempotentMethods,
         backoffStrategy: BackoffStrategy = .exponential(base: 0.5, maxDelay: 30),
-        retriesNetworkFailures: Bool = true
+        retriesNetworkFailures: Bool = true,
+        jitter: Jitter = .full,
+        maximumRetryAfter: TimeInterval = 60
     ) {
         self.maxRetries = max(0, maxRetries)
         self.retryableStatusCodes = retryableStatusCodes
         self.retryableMethods = retryableMethods
         self.backoffStrategy = backoffStrategy
         self.retriesNetworkFailures = retriesNetworkFailures
+        self.jitter = jitter
+        self.maximumRetryAfter = max(0, maximumRetryAfter)
     }
 
     /// Status codes retried by default: request timeout, rate limiting, and
@@ -50,6 +77,37 @@ public struct RetryPolicy: Sendable, Hashable {
         backoffStrategy: .none,
         retriesNetworkFailures: false
     )
+
+    /// How long to wait before the retry following `attempt`.
+    ///
+    /// A `Retry-After` header wins over the backoff schedule, and is honoured
+    /// exactly rather than jittered — jitter can only shorten a wait, and
+    /// waiting less than the server asked for is the failure this header exists
+    /// to prevent.
+    ///
+    /// - Returns: The wait, or `nil` when the server asked for longer than
+    ///   ``maximumRetryAfter`` and the request should therefore fail now.
+    public func wait(
+        forAttempt attempt: Int,
+        after error: LaravelError,
+        now: Date = Date()
+    ) -> TimeInterval? {
+        if let response = error.httpError?.response,
+           let requested = RetryAfter.seconds(from: response, now: now) {
+            return requested <= maximumRetryAfter ? requested : nil
+        }
+        return jittered(backoffStrategy.delay(for: attempt))
+    }
+
+    /// Applies ``jitter`` to a computed delay.
+    private func jittered(_ delay: TimeInterval) -> TimeInterval {
+        switch jitter {
+        case .none:
+            delay
+        case .full:
+            delay > 0 ? TimeInterval.random(in: 0 ... delay) : 0
+        }
+    }
 
     /// Whether `error` is worth repeating for a request using `method`.
     public func shouldRetry(_ error: LaravelError, method: HTTPMethod) -> Bool {

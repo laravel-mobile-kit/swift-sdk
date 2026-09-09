@@ -109,7 +109,9 @@ LaravelClientConfiguration(
         retryableStatusCodes: [408, 429, 500, 502, 503, 504],
         retryableMethods: RetryPolicy.idempotentMethods,   // GET, PUT, DELETE
         backoffStrategy: .exponential(base: 0.5, maxDelay: 30),
-        retriesNetworkFailures: true
+        retriesNetworkFailures: true,
+        jitter: .full,             // spread the waits
+        maximumRetryAfter: 60      // the longest Retry-After we will honour
     )
 )
 ```
@@ -119,6 +121,29 @@ LaravelClientConfiguration(
 `idempotentMethods`: retrying a payment because a proxy timed out is not a
 convenience. Decoding, encoding, and malformed-URL failures are never retried —
 they would fail identically.
+
+### Retry-After
+
+When a response carries `Retry-After` — servers send it with 429 and 503, in
+either the delay-seconds or the HTTP-date form — that value replaces the backoff
+schedule. Ignoring it is how a rate limit becomes a longer rate limit: the
+client spends the remaining budget faster than it refills.
+
+The header is honoured exactly, never jittered, because jitter can only shorten
+a wait and waiting less than the server asked for is the thing the header exists
+to prevent.
+
+`maximumRetryAfter` bounds it. A server asking for longer than that ends the
+retries and the request fails now, rather than the client either ignoring the
+instruction or sleeping for an interval a broken server chose.
+
+### Jitter
+
+`jitter: .full` — the default — waits a random duration in `0 ... delay` instead
+of exactly `delay`. Clients that fail together otherwise retry together: a
+server that drops requests for a second gets every one of them back at the same
+instant, having done nothing to shed the load that caused it. Use `.none` when
+you need a deterministic schedule, such as in a test.
 
 For failures that need something to *change* before a retry means anything —
 refreshing a token, waiting out a rate limit — use a `RetryDecider`. See

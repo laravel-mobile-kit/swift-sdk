@@ -57,7 +57,8 @@ a presigned upload endpoint, say — goes through the same client.
 
 | Type | Purpose |
 | --- | --- |
-| `struct RetryPolicy` | `maxRetries`, `retryableStatusCodes`, `retryableMethods`, `backoffStrategy`, `retriesNetworkFailures`. `.default`, `.none`, `idempotentMethods` |
+| `struct RetryPolicy` | `maxRetries`, `retryableStatusCodes`, `retryableMethods`, `backoffStrategy`, `retriesNetworkFailures`, `jitter`, `maximumRetryAfter`. `wait(forAttempt:after:now:)` honours `Retry-After`. `.default`, `.none`, `idempotentMethods` |
+| `enum RetryPolicy.Jitter` | `.none`, `.full` |
 | `enum BackoffStrategy` | `.none`, `.constant(delay:)`, `.exponential(base:maxDelay:)` |
 | `protocol RetryDecider` | `shouldRetry(_:request:attempt:)` — recovery that changes something first |
 
