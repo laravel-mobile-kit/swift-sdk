@@ -24,6 +24,12 @@ public enum LaravelError: Error, LocalizedError {
     case decodingError(any Error, data: Data)
     /// A request body could not be encoded.
     case encodingError(any Error)
+    /// A streamed response was asked for from a transport that cannot stream.
+    ///
+    /// Reported rather than quietly buffering: a caller asking for a stream is
+    /// usually waiting on the first token, and handing them the whole body at
+    /// the end would satisfy the type and miss the point.
+    case streamingUnsupported
 
     // MARK: - Status inspection
 
@@ -77,6 +83,8 @@ public enum LaravelError: Error, LocalizedError {
             "Failed to decode the response: \(underlying.localizedDescription)"
         case let .encodingError(underlying):
             "Failed to encode the request body: \(underlying.localizedDescription)"
+        case .streamingUnsupported:
+            "The configured transport cannot stream responses"
         }
     }
 }

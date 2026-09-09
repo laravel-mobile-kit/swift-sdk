@@ -16,7 +16,9 @@ public protocol HTTPTransport: Sendable {
 
 /// The default `URLSession`-backed transport.
 public final class URLSessionTransport: HTTPTransport, ProgressReportingTransport {
-    private let session: URLSession
+    /// Internal rather than private so the streaming conformance, which lives in
+    /// its own file, can start a task on the same session.
+    let session: URLSession
 
     /// Creates a transport owning a session built from `configuration`.
     public init(configuration: URLSessionConfiguration = .default) {

@@ -80,6 +80,7 @@ runnable SwiftUI application is in [`Examples/QuickStart`](Examples/QuickStart).
 - [Authentication](Documentation/AUTHENTICATION.md) — login, sessions, 401s, refresh
 - [Pagination](Documentation/PAGINATION.md) — all three Laravel paginators
 - [Uploads](Documentation/UPLOADS.md) — multipart and presigned direct uploads
+- [Streaming](Documentation/STREAMING.md) — reading a response as it arrives
 - [Error handling](Documentation/ERROR_HANDLING.md) — error types, validation errors
 - [Versioning](Documentation/VERSIONING.md) — `/v1` prefixes, unversioned auth routes
 - [Middleware](Documentation/MIDDLEWARE.md) — request/response interception, retry deciders

@@ -29,6 +29,9 @@ func delete<T: Decodable>(_ path: String, query: [String: String]?, options: Req
 func response<T: Decodable>(_ method: HTTPMethod, _ path: String, query: [String: String]?, body: Data?, options: RequestOptions, onProgress: (@Sendable (UploadProgress) -> Void)?) async throws -> Response<T>
 func raw(_ method: HTTPMethod, _ path: String, query: [String: String]?, body: Data?, options: RequestOptions, onProgress: (@Sendable (UploadProgress) -> Void)?) async throws -> Response<Data>
 
+// Streaming
+func stream(_ method: HTTPMethod, _ path: String, body: Data?, query: [String: String]?, options: RequestOptions) async throws -> AsyncThrowingStream<Data, any Error>
+
 // Pipeline
 func use(_ middleware: any Middleware)
 func use(_ middlewares: [any Middleware])
@@ -73,6 +76,8 @@ a presigned upload endpoint, say — goes through the same client.
 | `protocol HTTPTransport` | `execute(_:)` — swap for pinning, stubs, a shared session |
 | `final class URLSessionTransport` | The default transport. `init(configuration:)`, `init(session:)` |
 | `protocol ProgressReportingTransport` | Transports that report body progress |
+| `protocol StreamingTransport` | `stream(_:)` — transports that deliver a body incrementally |
+| `struct HTTPResponseStream` | `response` and `body`, so the head can be validated before the body is yielded |
 | `struct UploadProgress` | `bytesSent`, `totalBytes`, `fractionCompleted` |
 
 ## LaravelMobileKitLaravel
