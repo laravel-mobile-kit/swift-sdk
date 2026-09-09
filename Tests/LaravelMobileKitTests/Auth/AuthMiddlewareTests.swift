@@ -83,6 +83,53 @@ struct TokenProviderTests {
         )
     }
 
+    /// The provider holds no copy of the credential: every call reads the store.
+    ///
+    /// That is what makes a shared Keychain item work across processes. An app,
+    /// a share extension and a capture extension each build their own provider
+    /// over one access-group item, and whichever of them refreshes the token
+    /// last is the one the others must use. Caching here — an obvious-looking
+    /// optimisation, since the read is not free — would strand the other
+    /// processes on a token the server has already stopped accepting, and they
+    /// would not find out until a 401.
+    ///
+    /// The write below stands in for that other process.
+    @Test("A credential rotated underneath the provider is picked up immediately")
+    func rotationOutsideTheProviderIsPickedUp() async throws {
+        let store = InMemoryCredentialStore(credential: AuthCredential(accessToken: "first"))
+        let provider = CredentialTokenProvider(store: store)
+
+        #expect(try await provider.currentToken() == "first")
+
+        try await store.store(AuthCredential(accessToken: "second"))
+
+        // Not "after the next 401" — on the very next request.
+        #expect(try await provider.currentToken() == "second")
+        #expect(try await provider.currentCredential()?.accessToken == "second")
+    }
+
+    /// The same property, one layer up: the header the middleware writes has to
+    /// follow the store too, not just the provider's own accessor.
+    @Test("The middleware sends the rotated token, not the one it first saw")
+    func middlewareFollowsRotation() async throws {
+        let store = InMemoryCredentialStore(credential: AuthCredential(accessToken: "first"))
+        let transport = MockTransport(statusCode: 200, json: "{}")
+        let client = LaravelClient(
+            baseURL: URL(string: "https://api.example.com")!,
+            transport: transport
+        )
+        await client.use(AuthMiddleware(tokenProvider: CredentialTokenProvider(store: store)))
+
+        let _: EmptyResponse = try await client.get("/api/user")
+        try await store.store(AuthCredential(accessToken: "second"))
+        let _: EmptyResponse = try await client.get("/api/user")
+
+        let sent = await transport.executedRequests.map {
+            $0.value(forHTTPHeaderField: "Authorization")
+        }
+        #expect(sent == ["Bearer first", "Bearer second"])
+    }
+
     @Test("Clearing removes the credential from the store")
     func clearingDeletesCredential() async throws {
         let store = InMemoryCredentialStore(credential: AuthCredential(accessToken: "abc"))
