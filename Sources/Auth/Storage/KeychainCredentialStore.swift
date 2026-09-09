@@ -8,6 +8,17 @@ import Security
 /// `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly`, which lets background
 /// refreshes read the token after the first unlock while keeping it off other
 /// devices.
+///
+/// `CredentialStore` promises it is safe to call from several tasks at once, and
+/// here that is not free: an app, a share extension and a capture extension can
+/// all reach the same access-group item concurrently. Nothing mutable is stored
+/// — the coders are created per call rather than held, because `JSONEncoder` and
+/// `JSONDecoder` are classes and sharing one across tasks is a data race that
+/// only shows up under load.
+///
+/// `@unchecked` covers exactly one thing: `accessibility` is a `CFString`
+/// constant, which the compiler cannot prove `Sendable` and which is immutable
+/// in fact.
 public final class KeychainCredentialStore: CredentialStore, @unchecked Sendable {
     /// Keychain service the item belongs to, usually the app's bundle id.
     public let service: String
@@ -18,8 +29,6 @@ public final class KeychainCredentialStore: CredentialStore, @unchecked Sendable
 
     private let accessibility: CFString
     private let usesDataProtectionKeychain: Bool
-    private let encoder = JSONEncoder()
-    private let decoder = JSONDecoder()
 
     /// Creates a store for one credential.
     ///
@@ -47,18 +56,35 @@ public final class KeychainCredentialStore: CredentialStore, @unchecked Sendable
     // MARK: - CredentialStore
 
     public func store(_ credential: AuthCredential) async throws {
-        let data = try encoder.encode(credential)
+        let data = try JSONEncoder().encode(credential)
 
-        // Replacing rather than updating keeps one code path for both the
-        // first login and every later one.
-        SecItemDelete(baseQuery() as CFDictionary)
+        var addQuery = baseQuery()
+        addQuery[kSecValueData as String] = data
+        addQuery[kSecAttrAccessible as String] = accessibility
 
-        var query = baseQuery()
-        query[kSecValueData as String] = data
-        query[kSecAttrAccessible as String] = accessibility
-
-        let status = SecItemAdd(query as CFDictionary, nil)
-        guard status == errSecSuccess else {
+        // Add first, update on collision. The obvious alternative — delete then
+        // add — is two steps that are not atomic and cannot be made atomic here:
+        // the racing writer is often in another process (an app and its
+        // extensions share one access-group item), so no lock this type could
+        // take would cover it. Losing that race means both writers delete, both
+        // add, and one fails with `errSecDuplicateItem` having stored nothing.
+        let status = SecItemAdd(addQuery as CFDictionary, nil)
+        switch status {
+        case errSecSuccess:
+            return
+        case errSecDuplicateItem:
+            let attributes: [String: Any] = [
+                kSecValueData as String: data,
+                kSecAttrAccessible as String: accessibility,
+            ]
+            let updateStatus = SecItemUpdate(
+                baseQuery() as CFDictionary,
+                attributes as CFDictionary
+            )
+            guard updateStatus == errSecSuccess else {
+                throw KeychainError.unableToStore(updateStatus)
+            }
+        default:
             throw KeychainError.unableToStore(status)
         }
     }
@@ -77,7 +103,7 @@ public final class KeychainCredentialStore: CredentialStore, @unchecked Sendable
                 throw KeychainError.corruptedCredential
             }
             do {
-                return try decoder.decode(AuthCredential.self, from: data)
+                return try JSONDecoder().decode(AuthCredential.self, from: data)
             } catch {
                 throw KeychainError.corruptedCredential
             }

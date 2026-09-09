@@ -87,6 +87,54 @@ struct KeychainCredentialStoreTests {
         #expect(try await store.retrieve() == nil)
     }
 
+    /// Two stores over one item is the shipping arrangement, not an edge case:
+    /// an app and its extensions share an access-group item, and each holds its
+    /// own `KeychainCredentialStore`. Writing from the second one must succeed
+    /// rather than collide with what the first one already put there.
+    ///
+    /// Scope, stated plainly: this covers the update-on-collision path, not the
+    /// race that motivated it. The old delete-then-add would also pass here,
+    /// because sequential callers never collide.
+    ///
+    /// The race is not unit-testable from here. A task group of `store()` calls
+    /// would exercise it, but `store()` and `retrieve()` are `async` while
+    /// blocking for their whole duration, so a group of them starves the
+    /// cooperative pool and hangs a small CI runner instead of failing — that is
+    /// how the first draft of this test behaved. The concurrent writer is
+    /// usually in another process anyway, which no in-process test reaches. What
+    /// makes the race safe is the shape of `store()` itself: one `SecItemAdd`,
+    /// falling back to `SecItemUpdate`, with no window in which the item is
+    /// absent.
+    @Test("A second store over the same item writes without colliding")
+    func writesFromSeparateStoresDoNotCollide() async throws {
+        let service = "com.laravelmobilekit.tests.\(UUID().uuidString)"
+        let app = makeStore(service: service)
+        let extensionSide = makeStore(service: service)
+
+        try await withCleanup([app, extensionSide]) {
+            try await app.store(AuthCredential(accessToken: "from-app"))
+            try await extensionSide.store(AuthCredential(accessToken: "from-extension"))
+
+            #expect(try await app.retrieve()?.accessToken == "from-extension")
+            #expect(try await extensionSide.retrieve()?.accessToken == "from-extension")
+        }
+    }
+
+    /// Rewriting must also carry a changed accessibility across, since the
+    /// update path sets attributes rather than recreating the item.
+    @Test("Rewriting an existing item keeps it readable")
+    func rewriteKeepsItemReadable() async throws {
+        let store = makeStore()
+
+        try await withCleanup([store]) {
+            for index in 0 ..< 5 {
+                try await store.store(AuthCredential(accessToken: "token-\(index)"))
+            }
+
+            #expect(try await store.retrieve()?.accessToken == "token-4")
+        }
+    }
+
     @Test("Storing again replaces the previous credential")
     func storeReplaces() async throws {
         let store = makeStore()
