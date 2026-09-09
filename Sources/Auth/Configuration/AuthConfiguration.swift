@@ -23,6 +23,12 @@ public struct AuthConfiguration: Sendable, Hashable {
     public var passwordResetEndpoint: String?
     /// Re-sends an email verification link, when the API offers one.
     public var emailVerificationEndpoint: String?
+    /// Exchanges a third-party identity token — Apple's, Google's — for one of
+    /// the API's own.
+    ///
+    /// Defaults to ``loginEndpoint`` being reused, since plenty of APIs accept
+    /// either shape on one route. Point it elsewhere when yours does not.
+    public var identityTokenEndpoint: String?
 
     public init(
         loginEndpoint: String = "/api/login",
@@ -31,7 +37,8 @@ public struct AuthConfiguration: Sendable, Hashable {
         userEndpoint: String = "/api/user",
         refreshEndpoint: String = "/api/auth/refresh",
         passwordResetEndpoint: String? = "/api/forgot-password",
-        emailVerificationEndpoint: String? = "/api/email/verification-notification"
+        emailVerificationEndpoint: String? = "/api/email/verification-notification",
+        identityTokenEndpoint: String? = nil
     ) {
         self.loginEndpoint = loginEndpoint
         self.registerEndpoint = registerEndpoint
@@ -40,7 +47,12 @@ public struct AuthConfiguration: Sendable, Hashable {
         self.refreshEndpoint = refreshEndpoint
         self.passwordResetEndpoint = passwordResetEndpoint
         self.emailVerificationEndpoint = emailVerificationEndpoint
+        self.identityTokenEndpoint = identityTokenEndpoint
     }
+
+    /// Where an identity-token exchange is sent: its own route when configured,
+    /// the login route otherwise.
+    public var resolvedIdentityTokenEndpoint: String { identityTokenEndpoint ?? loginEndpoint }
 
     /// The routes a stock Laravel application exposes.
     public static let laravel = AuthConfiguration()
@@ -58,6 +70,7 @@ public struct AuthConfiguration: Sendable, Hashable {
         ]
         if let passwordResetEndpoint { endpoints.insert(passwordResetEndpoint) }
         if let emailVerificationEndpoint { endpoints.insert(emailVerificationEndpoint) }
+        if let identityTokenEndpoint { endpoints.insert(identityTokenEndpoint) }
         return endpoints
     }
 }

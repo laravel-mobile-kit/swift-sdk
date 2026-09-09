@@ -71,6 +71,91 @@ because they are the API's contract, not Swift property names.
 `logout()` tells the server first, but a failure there never blocks the local
 sign-out: an app must be able to sign out on a plane.
 
+## Sign in with Apple
+
+The flow has two halves. The app runs Apple's sheet and gets an identity token
+back; the server verifies that token and issues one of its own. The kit covers
+the seam between them, plus the nonce, which is where this usually goes wrong.
+
+```swift
+import AuthenticationServices
+
+let nonce = SignInWithAppleNonce()          // keep this alive until the callback
+
+let request = ASAuthorizationAppleIDProvider().createRequest()
+request.requestedScopes = [.fullName, .email]
+request.nonce = nonce.hashed                // Apple gets the hash
+```
+
+Then, in the delegate callback:
+
+```swift
+func authorizationController(
+    controller: ASAuthorizationController,
+    didCompleteWithAuthorization authorization: ASAuthorization
+) {
+    guard
+        let credential = authorization.credential as? ASAuthorizationAppleIDCredential,
+        let data = credential.identityToken,
+        let token = String(data: data, encoding: .utf8)
+    else { return }
+
+    Task {
+        try await auth.login(identityToken: token, nonce: nonce.raw)   // the server gets the raw value
+    }
+}
+```
+
+### The nonce, in one paragraph
+
+Apple's request carries the **hash**; the identity token comes back with that
+hash inside it as a claim. Your server hashes the **raw** value the app sent and
+compares. Matching proves the token was minted for this sign-in rather than
+replayed from another one — which is the entire reason the nonce exists.
+
+So: `nonce.hashed` goes to Apple, `nonce.raw` goes to your server, and the same
+`SignInWithAppleNonce` instance has to survive between the two. Generating a
+fresh one after the callback matches nothing, and sending the hashed form to the
+server fails with an error that never mentions nonces.
+
+### On the server
+
+Verification is the server's job, and only the server's: check the signature
+against Apple's JWKS, check `aud` is your bundle identifier, `iss` is Apple,
+`exp` is in the future, and that the `nonce` claim equals the SHA-256 of what the
+app sent. Anything a client checked, an attacker would simply skip.
+
+Apple sends the user's name **only on the first authorization**, and never again
+for that Apple ID. Capture it then or not at all:
+
+```swift
+try await auth.login(
+    identityToken: token,
+    nonce: nonce.raw,
+    extraFields: [
+        "given_name": credential.fullName?.givenName ?? "",
+        "family_name": credential.fullName?.familyName ?? "",
+    ]
+)
+```
+
+### Field names and routes
+
+By default the exchange posts `identity_token`, `nonce` and `provider` to
+`loginEndpoint`. Both bend:
+
+```swift
+AuthConfiguration(identityTokenEndpoint: "/api/auth/apple")
+
+try await auth.login(identityToken: token, provider: "google", fieldNames: .oidc)  // id_token
+```
+
+A configured `identityTokenEndpoint` joins the other auth routes in
+`allEndpoints`, so API versioning leaves it alone.
+
+Nothing here is Apple-specific except the defaults — the same call exchanges a
+Google or Microsoft identity token.
+
 ## Pointing at your own endpoints
 
 ```swift

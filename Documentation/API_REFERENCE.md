@@ -114,9 +114,11 @@ Sanctum SPA types. Both publish the same `AuthState`.
 
 | Type | Purpose |
 | --- | --- |
-| `actor AuthManager<User>` | `login(email:password:deviceName:extraFields:)`, `login(fields:)`, `register(fields:)`, `logout()`, `currentUser()`, `requestPasswordReset(email:)`, `resendEmailVerification()` |
+| `actor AuthManager<User>` | `login(email:password:deviceName:extraFields:)`, `login(fields:)`, `login(identityToken:nonce:provider:extraFields:fieldNames:)`, `register(fields:)`, `logout()`, `currentUser()`, `requestPasswordReset(email:)`, `resendEmailVerification()` |
 | `struct AuthResult<User>` | The credential and, when the response carried one, the user |
-| `struct AuthConfiguration` | Every endpoint path. `.laravel`, `allEndpoints` |
+| `struct AuthConfiguration` | Every endpoint path, including `identityTokenEndpoint`. `.laravel`, `allEndpoints`, `resolvedIdentityTokenEndpoint` |
+| `struct SignInWithAppleNonce` | `raw` for your server, `hashed` for Apple's request |
+| `struct IdentityTokenFieldNames` | `.default` (`identity_token`), `.oidc` (`id_token`) |
 | `struct AuthResponseMapper<User>` | `makeCredential`, `makeUser`; `.laravel` reads the common shapes |
 | `@MainActor final class AuthSession<User>` | `state`, `user`, `lastError`, `restore()`, `signIn(with:)`, `adopt(user:)`, `reloadUser()`, `logout()`, `endSession(reason:)`, `authFailureHandler()` |
 | `struct AuthCredential` | `accessToken`, `refreshToken`, `tokenType`, `expiresAt`, `isExpired`, `expires(within:from:)`, `authorizationHeaderValue` |

@@ -1,5 +1,9 @@
 import Foundation
 
+#if canImport(AuthenticationServices)
+import AuthenticationServices
+#endif
+
 import LaravelMobileKit
 
 /// The payload shape used by the custom-mapper example.
@@ -12,6 +16,56 @@ private struct TokenPayload: Decodable, Sendable {
 
 /// Examples from `Documentation/AUTHENTICATION.md`.
 enum AuthenticationSnippets {
+    // MARK: - Sign in with Apple
+
+    /// The half that belongs to the app: build the request carrying the hashed
+    /// nonce. `AuthenticationServices` is Apple-only, so this is guarded.
+    #if canImport(AuthenticationServices)
+    static func appleRequest(nonce: SignInWithAppleNonce) -> ASAuthorizationAppleIDRequest {
+        let request = ASAuthorizationAppleIDProvider().createRequest()
+        request.requestedScopes = [.fullName, .email]
+        request.nonce = nonce.hashed
+        return request
+    }
+    #endif
+
+    /// The half the kit covers: exchange the identity token for the API's own,
+    /// sending the raw nonce.
+    static func appleExchange(
+        auth: AuthManager<AppUser>,
+        identityToken: String,
+        nonce: SignInWithAppleNonce
+    ) async throws {
+        try await auth.login(identityToken: identityToken, nonce: nonce.raw)
+    }
+
+    /// Apple sends the name only on the first authorization for an Apple ID.
+    static func appleFirstSignIn(
+        auth: AuthManager<AppUser>,
+        identityToken: String,
+        nonce: SignInWithAppleNonce,
+        givenName: String?,
+        familyName: String?
+    ) async throws {
+        try await auth.login(
+            identityToken: identityToken,
+            nonce: nonce.raw,
+            extraFields: [
+                "given_name": givenName ?? "",
+                "family_name": familyName ?? "",
+            ]
+        )
+    }
+
+    /// A provider whose API spells the field the OIDC way, on its own route.
+    static func googleExchange(auth: AuthManager<AppUser>, idToken: String) async throws {
+        try await auth.login(identityToken: idToken, provider: "google", fieldNames: .oidc)
+    }
+
+    static var dedicatedAppleRoute: AuthConfiguration {
+        AuthConfiguration(identityTokenEndpoint: "/api/auth/apple")
+    }
+
     static func makeStore() -> KeychainCredentialStore {
         KeychainCredentialStore(
             service: "com.example.app",

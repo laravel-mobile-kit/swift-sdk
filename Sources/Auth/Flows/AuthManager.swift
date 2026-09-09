@@ -103,6 +103,57 @@ public actor AuthManager<User: Decodable & Sendable> {
         try await authenticate(at: configuration.loginEndpoint, fields: fields)
     }
 
+    /// Exchanges a third-party identity token for one of the API's own.
+    ///
+    /// This is the second half of Sign in with Apple — and of any other provider
+    /// that hands the app a signed JWT. The first half belongs to the app,
+    /// because it needs a view to present from; see
+    /// [Authentication](https://github.com/laravel-mobile-kit/swift-sdk/blob/main/Documentation/AUTHENTICATION.md)
+    /// for the `ASAuthorizationController` wiring.
+    ///
+    /// ```swift
+    /// let nonce = SignInWithAppleNonce()
+    /// request.nonce = nonce.hashed
+    /// // …
+    /// try await auth.login(identityToken: token, nonce: nonce.raw)
+    /// ```
+    ///
+    /// Pass the **raw** nonce, not the hashed one: the server hashes it and
+    /// compares the result against the claim inside the token, which is what
+    /// makes the token non-replayable.
+    ///
+    /// Verifying the token — against Apple's JWKS, checking `aud`, `iss`, `exp`
+    /// and that nonce claim — is the server's job. A client cannot do it
+    /// meaningfully; anything it checked, an attacker could skip.
+    ///
+    /// - Parameters:
+    ///   - identityToken: The signed JWT the provider returned.
+    ///   - nonce: The raw nonce, when the flow used one.
+    ///   - provider: Which provider issued the token.
+    ///   - extraFields: Anything else the endpoint expects — an authorization
+    ///     code, or the name Apple only sends on first sign-in.
+    ///   - fieldNames: The names to send these under, for APIs that spell them
+    ///     differently.
+    @discardableResult
+    public func login(
+        identityToken: String,
+        nonce: String? = nil,
+        provider: String = "apple",
+        extraFields: [String: String] = [:],
+        fieldNames: IdentityTokenFieldNames = .default
+    ) async throws -> AuthResult<User> {
+        var fields = extraFields
+        fields[fieldNames.identityToken] = identityToken
+        fields[fieldNames.provider] = provider
+        if let nonce {
+            fields[fieldNames.nonce] = nonce
+        }
+        return try await authenticate(
+            at: configuration.resolvedIdentityTokenEndpoint,
+            fields: fields
+        )
+    }
+
     /// Registers an account and adopts the credential the API issues.
     ///
     /// APIs that return no token on registration leave the session untouched:
