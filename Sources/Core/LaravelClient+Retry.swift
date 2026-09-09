@@ -40,7 +40,7 @@ extension LaravelClient {
                 // server asked to be left alone for longer than this client
                 // will wait, and shortening that is not ours to decide.
                 if policyAttempt < policy.maxRetries,
-                   policy.shouldRetry(error, method: request.method),
+                   policy.shouldRetry(error, request: request),
                    let wait = policy.wait(forAttempt: policyAttempt, after: error) {
                     try await backOff(wait)
                     policyAttempt += 1

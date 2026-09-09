@@ -17,6 +17,12 @@ extension LaravelClient {
         for (field, value) in request.headers {
             headers[field] = value
         }
+        // Last, and deliberately not overridable by the request's own headers:
+        // the key the retry engine acts on and the key the server sees have to
+        // be the same one.
+        if let key = request.idempotencyKey {
+            headers[configuration.idempotencyKeyHeader] = key
+        }
         return headers
     }
 }

@@ -72,7 +72,7 @@ extension LaravelClient {
                 return try await openStream(request)
             } catch let error as LaravelError {
                 if policyAttempt < policy.maxRetries,
-                   policy.shouldRetry(error, method: request.method),
+                   policy.shouldRetry(error, request: request),
                    let wait = policy.wait(forAttempt: policyAttempt, after: error) {
                     try await backOffBeforeStreamRetry(wait)
                     policyAttempt += 1

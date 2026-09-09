@@ -69,6 +69,16 @@ enum ErrorHandlingSnippets {
         )
     }
 
+    static func idempotentPost(client: LaravelClient, order: Data) async throws -> Receipt {
+        let key = UUID().uuidString   // once, where the operation starts
+
+        return try await client.post("/api/orders", body: order, options: .idempotent(key))
+    }
+
+    static var customIdempotencyHeader: LaravelClientConfiguration {
+        LaravelClientConfiguration(baseURL: baseURL, idempotencyKeyHeader: "X-Idempotency-Key")
+    }
+
     static func timeouts(client: LaravelClient) async throws {
         _ = LaravelClientConfiguration(baseURL: baseURL, timeoutInterval: 30)
 

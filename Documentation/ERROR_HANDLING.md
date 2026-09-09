@@ -122,6 +122,46 @@ LaravelClientConfiguration(
 convenience. Decoding, encoding, and malformed-URL failures are never retried —
 they would fail identically.
 
+### Retrying a POST
+
+`POST` is absent from `idempotentMethods`, so a create that fails on a flaky
+connection is reported rather than repeated. That default is right, and it is
+also inconvenient for the requests that cost the most — the ones where a dropped
+connection is most likely and most annoying.
+
+There are two ways around it and they are not equivalent.
+
+Adding `.post` to `retryableMethods` asserts that every `POST` this client sends
+is safe to repeat. That is rarely true, and nothing checks it.
+
+An idempotency key asserts it for one request, and gives the server what it needs
+to make it true:
+
+```swift
+let key = UUID().uuidString   // once, where the operation starts
+
+let receipt: Receipt = try await client.post(
+    "/api/orders",
+    body: order,
+    options: .idempotent(key)
+)
+```
+
+The key travels as `Idempotency-Key`, unchanged across every retry, so the server
+can recognise the second attempt as the same operation and answer with the first
+result instead of creating another order. Generate it where the operation begins,
+not inside the call that sends it — a key regenerated per attempt is no key at
+all.
+
+The header name is configurable, since `X-Idempotency-Key` is common too:
+
+```swift
+LaravelClientConfiguration(baseURL: baseURL, idempotencyKeyHeader: "X-Idempotency-Key")
+```
+
+A key says the request is *safe* to repeat, not that it is *worth* repeating: a
+`422` still fails on the first attempt.
+
 ### Retry-After
 
 When a response carries `Retry-After` — servers send it with 429 and 503, in

@@ -132,7 +132,8 @@ public actor LaravelClient {
             query: query,
             headers: options.headers,
             body: body,
-            timeout: options.timeout
+            timeout: options.timeout,
+            idempotencyKey: options.idempotencyKey
         )
     }
 

@@ -10,9 +10,9 @@ the index.
 | Type | Purpose |
 | --- | --- |
 | `actor LaravelClient` | The root client. One per API. |
-| `struct LaravelClientConfiguration` | `baseURL`, `defaultHeaders`, `headerProviders`, `timeoutInterval`, `retryPolicy` |
-| `struct RequestOptions` | Per-request `timeout` and `headers`. `.none`, `.timeout(_)`, `.headers(_)` |
-| `struct Request` | A transport-agnostic request: method, path, query, headers, body, timeout |
+| `struct LaravelClientConfiguration` | `baseURL`, `defaultHeaders`, `headerProviders`, `timeoutInterval`, `retryPolicy`, `idempotencyKeyHeader` |
+| `struct RequestOptions` | Per-request `timeout`, `headers` and `idempotencyKey`. `.none`, `.timeout(_)`, `.headers(_)`, `.idempotent(_)` |
+| `struct Request` | A transport-agnostic request: method, path, query, headers, body, timeout, idempotency key |
 | `struct Response<Value>` | A decoded value plus `httpResponse`, `rawData`, `statusCode`, `headers` |
 | `enum HTTPMethod` | `.get`, `.post`, `.put`, `.patch`, `.delete` |
 | `struct EmptyResponse` | Stand-in for a body-less response, such as `204` |

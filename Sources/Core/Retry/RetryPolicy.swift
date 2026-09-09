@@ -4,8 +4,13 @@ import Foundation
 /// client waits in between.
 ///
 /// `POST` is deliberately absent from ``default``: it is not idempotent, so a
-/// retried create can produce a duplicate record. Add it explicitly only for
-/// endpoints that are safe to repeat.
+/// retried create can produce a duplicate record.
+///
+/// There are two ways to retry one anyway, and they are not equivalent. Adding
+/// `.post` to ``retryableMethods`` asserts that every `POST` this client sends
+/// is safe to repeat, which is rarely true. Setting
+/// ``RequestOptions/idempotencyKey`` asserts it for one request, and gives the
+/// server what it needs to make it true. Prefer the second.
 public struct RetryPolicy: Sendable, Hashable {
     /// How a computed wait is randomised.
     public enum Jitter: Sendable, Hashable {
@@ -109,10 +114,28 @@ public struct RetryPolicy: Sendable, Hashable {
         }
     }
 
+    /// Whether `error` is worth repeating for `request`.
+    ///
+    /// A request carrying an idempotency key is retryable whatever its method.
+    /// That is the entire trade `POST` is excluded from ``idempotentMethods``
+    /// for: repeating a create may make a second record, unless the caller has
+    /// told the server how to recognise the repeat.
+    public func shouldRetry(_ error: LaravelError, request: Request) -> Bool {
+        guard maxRetries > 0 else { return false }
+        guard request.idempotencyKey != nil || retryableMethods.contains(request.method) else {
+            return false
+        }
+        return isTransient(error)
+    }
+
     /// Whether `error` is worth repeating for a request using `method`.
     public func shouldRetry(_ error: LaravelError, method: HTTPMethod) -> Bool {
         guard maxRetries > 0, retryableMethods.contains(method) else { return false }
+        return isTransient(error)
+    }
 
+    /// Whether the failure itself is one that repeating could fix.
+    private func isTransient(_ error: LaravelError) -> Bool {
         if let statusCode = error.statusCode {
             return retryableStatusCodes.contains(statusCode)
         }

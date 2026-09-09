@@ -52,6 +52,97 @@ struct RetryTests {
         #expect(BackoffStrategy.none.delay(for: 9) == 0)
     }
 
+    // MARK: - Idempotency keys
+
+    @Test("A keyed POST is retried; an unkeyed one is not")
+    func idempotencyKeyMakesPOSTRetryable() async throws {
+        let unkeyed = MockTransport(statusCodes: [503, 200], json: #"{"id":1,"title":"L"}"#)
+        let keyed = MockTransport(statusCodes: [503, 200], json: #"{"id":1,"title":"L"}"#)
+
+        let clientA = makeClient(transport: unkeyed, policy: immediatePolicy())
+        await #expect(throws: LaravelError.self) {
+            let _: Event = try await clientA.post("/api/events", body: CreateEvent(title: "L"))
+        }
+        #expect(await unkeyed.attemptCount == 1)
+
+        let clientB = makeClient(transport: keyed, policy: immediatePolicy())
+        let event: Event = try await clientB.post(
+            "/api/events",
+            body: CreateEvent(title: "L"),
+            options: .idempotent("order-42")
+        )
+
+        #expect(event == Event(id: 1, title: "L"))
+        #expect(await keyed.attemptCount == 2)
+    }
+
+    @Test("Every attempt carries the same key, so the server can recognise the repeat")
+    func theKeyIsStableAcrossRetries() async throws {
+        let transport = MockTransport(statusCodes: [503, 503, 200], json: #"{"id":1,"title":"L"}"#)
+        let client = makeClient(transport: transport, policy: immediatePolicy())
+
+        let _: Event = try await client.post(
+            "/api/events",
+            body: CreateEvent(title: "L"),
+            options: .idempotent("order-42")
+        )
+
+        let keys = await transport.executedRequests.map {
+            $0.value(forHTTPHeaderField: "Idempotency-Key")
+        }
+        #expect(keys == ["order-42", "order-42", "order-42"])
+    }
+
+    @Test("No key means no header")
+    func noKeyMeansNoHeader() async throws {
+        let transport = MockTransport(statusCode: 200, json: #"{"id":1,"title":"L"}"#)
+        let client = makeClient(transport: transport, policy: immediatePolicy())
+
+        let _: Event = try await client.post("/api/events", body: CreateEvent(title: "L"))
+
+        let sent = await transport.executedRequests.first?
+            .value(forHTTPHeaderField: "Idempotency-Key")
+        #expect(sent == nil)
+    }
+
+    @Test("The header name is configurable for APIs that spell it differently")
+    func headerNameIsConfigurable() async throws {
+        let transport = MockTransport(statusCode: 200, json: #"{"id":1,"title":"L"}"#)
+        let client = LaravelClient(
+            configuration: LaravelClientConfiguration(
+                baseURL: baseURL,
+                idempotencyKeyHeader: "X-Idempotency-Key"
+            ),
+            transport: transport
+        )
+
+        let _: Event = try await client.post(
+            "/api/events",
+            body: CreateEvent(title: "L"),
+            options: .idempotent("order-42")
+        )
+
+        let request = await transport.executedRequests.first
+        #expect(request?.value(forHTTPHeaderField: "X-Idempotency-Key") == "order-42")
+        #expect(request?.value(forHTTPHeaderField: "Idempotency-Key") == nil)
+    }
+
+    @Test("A key does not make a permanent failure retryable")
+    func keyDoesNotRetryNonTransientFailures() async throws {
+        let transport = MockTransport(statusCodes: [422])
+        let client = makeClient(transport: transport, policy: immediatePolicy())
+
+        await #expect(throws: LaravelError.self) {
+            let _: Event = try await client.post(
+                "/api/events",
+                body: CreateEvent(title: "L"),
+                options: .idempotent("order-42")
+            )
+        }
+        // The key says "safe to repeat", not "worth repeating".
+        #expect(await transport.attemptCount == 1)
+    }
+
     // MARK: - Retry-After and jitter
 
     /// A failure carrying the response headers a server would have sent.

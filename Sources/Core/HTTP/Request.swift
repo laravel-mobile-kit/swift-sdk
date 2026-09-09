@@ -18,6 +18,12 @@ public struct Request: Sendable, Hashable {
     public var body: Data?
     /// Timeout for this request, overriding the client-wide timeout.
     public var timeout: TimeInterval?
+    /// Idempotency key, when the caller supplied one.
+    ///
+    /// Carried on the request rather than folded into ``headers`` because the
+    /// retry engine has to read it: a keyed request is safe to repeat whatever
+    /// its method, and that decision is made from a ``Request``.
+    public var idempotencyKey: String?
 
     public init(
         method: HTTPMethod,
@@ -25,7 +31,8 @@ public struct Request: Sendable, Hashable {
         query: [String: String]? = nil,
         headers: [String: String] = [:],
         body: Data? = nil,
-        timeout: TimeInterval? = nil
+        timeout: TimeInterval? = nil,
+        idempotencyKey: String? = nil
     ) {
         self.method = method
         self.path = path
@@ -33,5 +40,6 @@ public struct Request: Sendable, Hashable {
         self.headers = headers
         self.body = body
         self.timeout = timeout
+        self.idempotencyKey = idempotencyKey
     }
 }
