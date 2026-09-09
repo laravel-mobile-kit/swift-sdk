@@ -66,7 +66,7 @@ a presigned upload endpoint, say — goes through the same client.
 | Type | Purpose |
 | --- | --- |
 | `protocol Middleware` | `process(_:)`, `didReceive(_:data:)` |
-| `struct LoggingMiddleware` | `.none`, `.basic`, `.headers`, `.body`, with a custom `sink` |
+| `struct LoggingMiddleware` | `.none`, `.basic`, `.headers`, `.body`; `bodies:` and `redactedHeaders:` control what is withheld; custom `sink` |
 | `protocol HeaderProvider` | `headers()` computed per request |
 | `struct StaticHeaders`, `struct DynamicHeaders` | The two ready-made providers |
 | `protocol HTTPTransport` | `execute(_:)` — swap for pinning, stubs, a shared session |

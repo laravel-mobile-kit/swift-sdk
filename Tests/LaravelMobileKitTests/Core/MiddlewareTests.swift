@@ -149,13 +149,21 @@ struct LoggingMiddlewareTests {
         }
     }
 
-    private func lines(at level: LoggingMiddleware.Level) async throws -> [String] {
+    private func lines(
+        at level: LoggingMiddleware.Level,
+        bodies: LoggingMiddleware.BodyLogging = .sizeOnly,
+        options: RequestOptions = .none
+    ) async throws -> [String] {
         let sink = LogSink()
         let transport = MockTransport(statusCode: 201, json: #"{"id":1,"title":"Launch"}"#)
         let client = LaravelClient(baseURL: baseURL, transport: transport)
-        await client.use(LoggingMiddleware(level: level, sink: sink.makeSink()))
+        await client.use(LoggingMiddleware(level: level, bodies: bodies, sink: sink.makeSink()))
 
-        let _: Event = try await client.post("/api/events", body: CreateEvent(title: "Launch"))
+        let _: Event = try await client.post(
+            "/api/events",
+            body: CreateEvent(title: "Launch"),
+            options: options
+        )
 
         return sink.lines
     }
@@ -198,11 +206,73 @@ struct LoggingMiddlewareTests {
         #expect(sink.lines.contains { $0.lowercased().contains("x-request-id: abc123") })
     }
 
-    @Test("The body level adds request and response payloads")
-    func bodyLevel() async throws {
+    @Test("The body level reports payload sizes, not payloads")
+    func bodyLevelWithheldByDefault() async throws {
         let lines = try await lines(at: .body)
 
-        #expect(lines.contains { $0.contains(#""title":"Launch""# ) })
+        // Raising the level is not consent to print what the user typed.
+        #expect(!lines.contains { $0.contains(#""title":"Launch""#) })
+        #expect(!lines.contains { $0.contains(#""id":1"#) })
+        #expect(lines.contains { $0.contains("bytes>") })
+    }
+
+    @Test("Payloads are logged only when the caller asks for them")
+    func bodyLevelUnredacted() async throws {
+        let lines = try await lines(at: .body, bodies: .unredacted)
+
+        #expect(lines.contains { $0.contains(#""title":"Launch""#) })
         #expect(lines.contains { $0.contains(#""id":1"#) })
+    }
+
+    @Test("Credential-bearing request headers are redacted")
+    func requestCredentialsAreRedacted() async throws {
+        let lines = try await lines(
+            at: .headers,
+            options: .headers(["Authorization": "Bearer super-secret-token"])
+        )
+
+        #expect(!lines.contains { $0.contains("super-secret-token") })
+        #expect(lines.contains { $0.contains("Authorization: <redacted>") })
+        // Redaction is targeted: ordinary headers still come through.
+        #expect(lines.contains { $0.contains("Accept: application/json") })
+    }
+
+    @Test("Credential-bearing response headers are redacted")
+    func responseCredentialsAreRedacted() async throws {
+        let sink = LogSink()
+        let transport = MockTransport(
+            statusCode: 200,
+            body: Data(#"{"id":1,"title":"Launch"}"#.utf8),
+            headers: ["Set-Cookie": "session=super-secret-session", "X-Request-Id": "abc123"]
+        )
+        let client = LaravelClient(baseURL: baseURL, transport: transport)
+        await client.use(LoggingMiddleware(level: .headers, sink: sink.makeSink()))
+
+        let _: Event = try await client.get("/api/events/1")
+
+        #expect(!sink.lines.contains { $0.contains("super-secret-session") })
+        #expect(sink.lines.contains { $0.lowercased().contains("set-cookie: <redacted>") })
+        #expect(sink.lines.contains { $0.lowercased().contains("x-request-id: abc123") })
+    }
+
+    @Test("The redacted header set is caller-configurable and case-insensitive")
+    func redactionIsConfigurable() async throws {
+        let sink = LogSink()
+        let transport = MockTransport(statusCode: 200, json: #"{"id":1,"title":"Launch"}"#)
+        let client = LaravelClient(baseURL: baseURL, transport: transport)
+        await client.use(
+            LoggingMiddleware(
+                level: .headers,
+                redactedHeaders: ["X-Tenant-Secret"],
+                sink: sink.makeSink()
+            )
+        )
+
+        let _: Event = try await client.get(
+            "/api/events/1",
+            options: .headers(["x-tenant-secret": "hunter2"])
+        )
+
+        #expect(!sink.lines.contains { $0.contains("hunter2") })
     }
 }

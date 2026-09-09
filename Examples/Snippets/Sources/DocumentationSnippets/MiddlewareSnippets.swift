@@ -61,6 +61,8 @@ enum MiddlewareSnippets {
     static func logging(client: LaravelClient) async {
         await client.use(LoggingMiddleware(level: .headers))
         await client.use(LoggingMiddleware(level: .body, sink: { line in print(line) }))
+        await client.use(LoggingMiddleware(level: .headers, redactedHeaders: ["X-Tenant-Secret"]))
+        await client.use(LoggingMiddleware(level: .body, bodies: .unredacted))
     }
 
     static var staticHeaders: LaravelClientConfiguration {

@@ -70,7 +70,7 @@ await client.use(LoggingMiddleware(level: .headers))
 | `.none` | Nothing |
 | `.basic` | Method, URL, status |
 | `.headers` | `.basic` plus request and response headers |
-| `.body` | `.headers` plus payloads |
+| `.body` | `.headers` plus payload sizes |
 
 Log lines go to `print` unless you redirect them:
 
@@ -78,7 +78,30 @@ Log lines go to `print` unless you redirect them:
 await client.use(LoggingMiddleware(level: .body, sink: { logger.debug("\($0)") }))
 ```
 
-Bodies and headers contain tokens — keep `.body` out of release builds.
+### What is withheld
+
+Two things are redacted by default, and both defaults are deliberate: a log
+level is the easiest thing in a codebase to raise in a hurry and the easiest to
+forget to lower.
+
+**Credential-bearing headers** are replaced with `<redacted>` at every level —
+`Authorization`, `Proxy-Authorization`, `Cookie`, `Set-Cookie`, `X-Api-Key`,
+`X-Auth-Token`, `X-CSRF-Token`, `X-XSRF-Token`. Pass `redactedHeaders:` to
+extend or replace that set; matching is case-insensitive.
+
+```swift
+await client.use(LoggingMiddleware(level: .headers, redactedHeaders: ["X-Tenant-Secret"]))
+```
+
+**Bodies** are logged as a byte count. Printing their content is a separate
+argument rather than a higher level, because payloads carry credentials,
+personal data, and whatever the user typed:
+
+```swift
+await client.use(LoggingMiddleware(level: .body, bodies: .unredacted))
+```
+
+Choose `.unredacted` for a local debugging session, not for a build you ship.
 
 ## Headers
 
