@@ -22,7 +22,7 @@ let events: [Event] = try await client.get("/api/events")
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/laravel-mobile-kit/swift-sdk.git", from: "0.1.0")
+    .package(url: "https://github.com/laravel-mobile-kit/swift-sdk.git", from: "0.2.0")
 ]
 ```
 
@@ -88,6 +88,7 @@ runnable SwiftUI application is in [`Examples/QuickStart`](Examples/QuickStart).
 - [Compatibility](Documentation/COMPATIBILITY.md) — Laravel, Swift, and platform versions
 - [Migration](Documentation/MIGRATION.md) — from a hand-written networking layer
 - [Testing](Documentation/TESTING.md) — running the suites, including against a real Laravel app
+- [Changelog](CHANGELOG.md) — what changed in each release
 - [Definition of Done](Documentation/DEFINITION_OF_DONE.md) — the MVP checklist and the test that accepts each item
 
 ## Requirements

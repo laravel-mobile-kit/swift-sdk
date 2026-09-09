@@ -4,7 +4,7 @@
 
 | Mobile Kit SDK | Laravel API contract | Laravel framework | Swift | iOS | macOS | tvOS | watchOS |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| 0.1.x | unversioned, `/v1` | 12, 13 (verified); 10 and 11 expected | 6.0+ | 15+ | 12+ | 15+ | 8+ |
+| 0.2.x | unversioned, `/v1` | 12, 13 (verified); 10 and 11 expected | 6.0+ | 15+ | 12+ | 15+ | 8+ |
 
 The three version axes move independently: the SDK version, the version of your
 API (`/api/v1`), and the Laravel release the server runs. Shipping Mobile Kit 1.0
