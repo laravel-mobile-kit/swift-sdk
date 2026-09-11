@@ -4,24 +4,30 @@
 
 | Mobile Kit SDK | Laravel API contract | Laravel framework | Swift | iOS | macOS | tvOS | watchOS |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| 0.2.x | unversioned, `/v1` | 12, 13 (verified); 10 and 11 expected | 6.0+ | 15+ | 12+ | 15+ | 8+ |
+| 0.2.x | unversioned, `/v1` | 12 (verified); 10, 11 and 13 expected | 6.0+ | 15+ | 12+ | 15+ | 8+ |
 
 The three version axes move independently: the SDK version, the version of your
 API (`/api/v1`), and the Laravel release the server runs. Shipping Mobile Kit 1.0
 does not imply API v1, and upgrading Laravel does not require a new SDK.
 
 The integration suite runs against a Laravel application generated from the
-official skeleton — see [Testing](TESTING.md). The whole suite has been run
-against Laravel 12 and Laravel 13; `LARAVEL_VERSION` selects which release the
-fixture is built from:
+official skeleton — see [Testing](TESTING.md). Laravel 12 is what CI builds and
+what every release has been tested on. `LARAVEL_VERSION` selects a different
+release for a local run:
 
 ```sh
+rm -rf TestApp/.laravel
 LARAVEL_VERSION='^13.0' TestApp/scripts/serve.sh
 ```
 
-Laravel 10 and 11 are expected to work — the kit uses only conventions that have
-been stable since Laravel 8 — but they are not covered by a run here, so treat
-them as unverified rather than guaranteed.
+The `rm` is not optional: the fixture is created once, and with `TestApp/.laravel`
+already on disk the variable is read by nothing and the old application is served
+instead — a run that looks like it proved something about another release.
+
+Laravel 10, 11 and 13 are expected to work — the kit uses only conventions that
+have been stable since Laravel 8 — but no run here covers them, so treat them as
+unverified rather than guaranteed. Verifying one means adding it to the CI
+matrix, not remembering a local run.
 
 ## Supported Laravel conventions
 
@@ -35,6 +41,7 @@ them as unverified rather than guaranteed.
 | `cursorPaginate()` | Supported |
 | Resource collections with `meta`/`links` | Supported |
 | Standard HTTP status handling | Supported by Core |
+| Streamed responses (`text/event-stream`, chunked bodies) | Supported by `LaravelClient.stream` — see [Streaming](STREAMING.md) |
 | `multipart/form-data` | Supported by the Uploads module |
 | Presigned direct uploads (Vapor-style and hand-written) | Supported |
 | Sanctum personal access tokens | Supported |

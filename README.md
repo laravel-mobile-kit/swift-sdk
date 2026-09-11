@@ -94,8 +94,8 @@ runnable SwiftUI application is in [`Examples/QuickStart`](Examples/QuickStart).
 ## Requirements
 
 iOS 15+, macOS 12+, tvOS 15+, watchOS 8+, Swift 6.0+. The integration suite is
-run against Laravel 12 and 13 — see
-[Compatibility](Documentation/COMPATIBILITY.md).
+run against Laravel 12; 10, 11 and 13 are expected to work but are not covered
+by a run — see [Compatibility](Documentation/COMPATIBILITY.md).
 
 ## Tests
 
